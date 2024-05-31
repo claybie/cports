@@ -272,6 +272,11 @@ def do_build(self):
         "env",
         "-u",
         "PKG_CONFIG",
+        # prevent global flags from being applied to wasi/other targets
+        "-u",
+        "CFLAGS",
+        "-u",
+        "CXXFLAGS",
         "--",
         "python",
         "x.py",
