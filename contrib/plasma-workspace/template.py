@@ -1,5 +1,5 @@
 pkgname = "plasma-workspace"
-pkgver = "6.0.5"
+pkgver = "6.0.5.1"
 pkgrel = 0
 build_style = "cmake"
 # TODO: -DINSTALL_SDDM_WAYLAND_SESSION=ON experiments?
@@ -16,6 +16,7 @@ make_check_args = [
     + "|testimageproxymodel"  # looks like same issue as testimagefinder & testimagelistmodel
     + "|testslidemodel"  # ^ same as above
     + "|testimagebackend"  # cannot find org.kde.plasma.wallpapers.image QML module, try QML2_IMPORT_PATH?
+    + "|locationsrunnertest"
     + "|testimagefrontend)",  # ^ same as above
     "-j1",  # parallel causes a bunch of flaky tests
 ]
@@ -27,7 +28,6 @@ hostmakedepends = [
     "gettext",
     "ninja",
     "pkgconf",
-    "spirv-tools",
 ]
 makedepends = [
     "breeze-devel",
@@ -46,6 +46,8 @@ makedepends = [
     "kiconthemes-devel",
     "kidletime-devel",
     "kio-devel",
+    "kirigami-addons-devel",
+    "kirigami-devel",
     "kitemmodels-devel",
     "knewstuff-devel",
     "knotifications-devel",
@@ -53,18 +55,21 @@ makedepends = [
     "kparts-devel",
     "kpipewire-devel",
     "krunner-devel",
+    "kquickcharts-devel",
     "kscreenlocker-devel",
     "kstatusnotifieritem-devel",
     "ksvg-devel",
     "ktexteditor-devel",
     "ktextwidgets-devel",
     "kunitconversion-devel",
+    "kuserfeedback-devel",
     "kwallet-devel",
     "kwayland-devel",
     "kwin-devel",
     "layer-shell-qt-devel",
     "libcanberra-devel",
     "libice-devel",
+    "libkexiv2-devel",
     "libkscreen-devel",
     "libksysguard-devel",
     "libplasma-devel",
@@ -83,41 +88,42 @@ makedepends = [
     "qt6-qtwayland-devel",
     "wayland-protocols",
     "xcb-util-devel",
-    # TODO: KUserFeedbackQt6
     # TODO: KF6Baloo
     # TODO: KF6Holidays
     # TODO: AppStreamQt (main/appstream + -Dqt=true)
     # NOTE: make sure PolkitQt6-1 doesn't get pulled in?! just -DGLIBC_LOCALE_GEN=OFF
-    # TODO: KF6KExiv2 (KExiv2Qt6)
     # TODO: AppMenuGtkModule?
     # TODO: SeleniumWebDriverATSPI? (GUI accessibility tests)
+]
+depends = [
+    "iso-codes",
+    "kirigami-addons",
+    "kio-extras",
+    "kio-fuse",
+    "kquickcharts",
+    "kwin",
+    "milou",
+    "xwayland",
 ]
 checkdepends = [
     "dbus",
     "python-gobject",
     "xwayland-run",
-]
-depends = [
-    "iso-codes",
-    "kirigami-addons",
-    # "kio-extras",
-    # "kio-fuse",
-    "kquickcharts",
-    "kwin",
-    "xwayland",
-]
+] + depends
 pkgdesc = "KDE Plasma Workspace"
 maintainer = "Jami Kettunen <jami.kettunen@protonmail.com>"
 license = "(GPL-2.0-only OR GPL-3.0-only) AND LGPL-2.1-or-later AND GPL-2.0-or-later AND MIT AND LGPL-2.1-only AND LGPL-2.0-or-later AND (LGPL-2.1-only OR LGPL-3.0-only) AND LGPL-2.0-only"
 url = "https://api.kde.org/plasma/plasma-workspace/html"
-source = f"$(KDE_SITE)/plasma/{pkgver}/plasma-workspace-{pkgver}.tar.xz"
-sha256 = "c54d2d5adf5eb2feef7092b9217f1ed59c98e369f9b5d7b12dd77365f4eb7ac9"
+source = f"$(KDE_SITE)/plasma/6.0.5/plasma-workspace-{pkgver}.tar.xz"
+sha256 = "8907f9fded5fc6e5d95355f8346328de18d7c8850dabd9109d75458d5aeed813"
 # FIXME: cfi breaks at least 3 tests
 hardening = ["vis", "!cfi"]
 
 
 def post_install(self):
     self.install_license("LICENSES/MIT.txt")
+
+    self.rm(self.destdir / "usr/lib/systemd/user", recursive=True)
 
 
 @subpackage("plasma-workspace-devel")

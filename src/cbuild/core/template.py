@@ -420,6 +420,7 @@ core_fields = [
     # build directory and patches
     ("build_wrksrc", "", str, False, False, False),
     ("patch_args", [], list, False, False, False),
+    ("prepare_after_patch", False, bool, False, False, False),
     # dependency lists
     ("checkdepends", [], list, False, False, False),
     ("hostmakedepends", [], list, False, False, False),
@@ -498,6 +499,7 @@ core_fields_priority = [
     ("archs", True),
     ("build_wrksrc", True),
     ("build_style", True),
+    ("prepare_after_patch", True),
     ("configure_script", True),
     ("configure_args", True),
     ("configure_env", True),
@@ -1557,6 +1559,14 @@ class Template(Package):
 
     def install_svscript(self, src, name=None):
         self.install_file(src, "etc/dinit.d/scripts", mode=0o755, name=name)
+
+    def install_tmpfiles(self, src, name=None):
+        svname = name or self.pkgname
+        self.install_file(src, "usr/lib/tmpfiles.d", name=f"{svname}.conf")
+
+    def install_sysusers(self, src, name=None):
+        svname = name or self.pkgname
+        self.install_file(src, "usr/lib/sysusers.d", name=f"{svname}.conf")
 
     def install_link(self, dest, tgt, absolute=False):
         dest = pathlib.Path(dest)
