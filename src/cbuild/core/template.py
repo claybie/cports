@@ -462,7 +462,7 @@ core_fields = [
     ("tools", {}, dict, False, False, False),
     ("tool_flags", {}, dict, False, False, False),
     ("env", {}, dict, False, False, False),
-    ("debug_level", 2, int, False, False, False),
+    ("debug_level", -1, int, False, False, False),
     # packaging
     ("origin", None, str, False, True, True),
     ("triggers", [], list, False, True, False),
@@ -1275,6 +1275,11 @@ class Template(Package):
         lld_args = compiler._get_lld_cpuargs(self.link_threads)
         if self.options["linkundefver"]:
             lld_args += ["--undefined-version"]
+        if self.use_ltocache:
+            lld_args += [
+                f"--thinlto-cache-policy=cache_size_bytes={self.use_ltocache}",
+                "--thinlto-cache-dir=/cbuild_cache/lld_thinlto_cache",
+            ]
 
         return chroot.enter(
             cmd,
@@ -2204,7 +2209,7 @@ def read_mod(
     run_check,
     jobs,
     build_dbg,
-    use_ccache,
+    caches,
     origin,
     resolve=None,
     ignore_missing=False,
@@ -2267,7 +2272,8 @@ def read_mod(
     ret.force_mode = force_mode
     ret.bulk_mode = bulk_mode
     ret.build_dbg = build_dbg
-    ret.use_ccache = use_ccache
+    ret.use_ccache = caches[0] if caches else None
+    ret.use_ltocache = caches[1] if caches else None
     ret.conf_jobs = jobs[0]
     ret.conf_link_threads = jobs[1]
     ret.stage = stage
@@ -2334,7 +2340,7 @@ def read_pkg(
     run_check,
     jobs,
     build_dbg,
-    use_ccache,
+    caches,
     origin,
     resolve=None,
     ignore_missing=False,
@@ -2352,7 +2358,7 @@ def read_pkg(
         run_check,
         jobs,
         build_dbg,
-        use_ccache,
+        caches,
         origin,
         resolve,
         ignore_missing,

@@ -18,6 +18,8 @@ opt_harch = None
 opt_gen_dbg = True
 opt_check = True
 opt_ccache = False
+opt_tltocache = False
+opt_tltocachesize = "10g"
 opt_comp = "zstd"
 opt_makejobs = 0
 opt_lthreads = 0
@@ -97,8 +99,8 @@ def handle_options():
     global cmdline
 
     global opt_apkcmd, opt_bwcmd, opt_dryrun, opt_bulkcont
-    global opt_cflags, opt_cxxflags, opt_fflags
-    global opt_arch, opt_harch, opt_gen_dbg, opt_check, opt_ccache
+    global opt_arch, opt_cflags, opt_cxxflags, opt_fflags, opt_tltocache
+    global opt_harch, opt_gen_dbg, opt_check, opt_ccache, opt_tltocachesize
     global opt_makejobs, opt_lthreads, opt_nocolor, opt_signkey
     global opt_unsigned, opt_force, opt_mdirtemp, opt_allowcat, opt_restricted
     global opt_nonet, opt_dirty, opt_statusfd, opt_keeptemp, opt_forcecheck
@@ -312,11 +314,15 @@ def handle_options():
 
         opt_gen_dbg = bcfg.getboolean("build_dbg", fallback=opt_gen_dbg)
         opt_ccache = bcfg.getboolean("ccache", fallback=opt_ccache)
+        opt_tltocache = bcfg.getboolean("thinlto_cache", fallback=opt_tltocache)
         opt_check = bcfg.getboolean("check", fallback=opt_check)
         opt_checkfail = bcfg.getboolean("check_fail", fallback=opt_checkfail)
         opt_stage = bcfg.getboolean("keep_stage", fallback=opt_stage)
         opt_makejobs = bcfg.getint("jobs", fallback=opt_makejobs)
         opt_lthreads = bcfg.getint("link_threads", fallback=opt_lthreads)
+        opt_tltocachesize = bcfg.get(
+            "thinlto_cache_size", fallback=opt_tltocachesize
+        )
         opt_bwcmd = bcfg.get("bwrap", fallback=opt_bwcmd)
         opt_arch = bcfg.get("arch", fallback=opt_arch)
         opt_harch = bcfg.get("host_arch", fallback=opt_harch)
@@ -525,7 +531,10 @@ def short_traceback(e, log):
         log.out(f"  {fs.filename}:{fs.lineno}:", end="")
         log.out_plain(f" in function '{fs.name}'")
     log.out("Raised exception:")
-    log.out(f"  {type(e).__name__}: ", end="")
+    if hasattr(e, "filename"):
+        log.out(f"  {type(e).__name__} ({e.filename}): ", end="")
+    else:
+        log.out(f"  {type(e).__name__}: ", end="")
     match type(e):
         case subprocess.CalledProcessError:
             # a bit nicer handling of cmd
@@ -604,7 +613,7 @@ def bootstrap(tgt):
     paths.set_stage(0)
     paths.reinit_buildroot(oldmdir, 0)
 
-    if not chroot.chroot_check(True):
+    if not chroot.chroot_check(True, False):
         logger.get().out("cbuild: bootstrapping stage 0")
 
         # extra program checks
@@ -661,7 +670,7 @@ def bootstrap(tgt):
     # set build root to stage 1 for chroot check
     paths.reinit_buildroot(oldmdir, 1)
 
-    if not chroot.chroot_check(True):
+    if not chroot.chroot_check(True, False):
         logger.get().out("cbuild: bootstrapping stage 1")
         # use stage 0 build root to build, but build into stage 1 repo
         paths.reinit_buildroot(oldmdir, 0)
@@ -681,7 +690,7 @@ def bootstrap(tgt):
     # set build root to stage 2 for chroot check
     paths.reinit_buildroot(oldmdir, 2)
 
-    if not chroot.chroot_check(True):
+    if not chroot.chroot_check(True, False):
         logger.get().out("cbuild: bootstrapping stage 2")
         # use stage 1 build root to build, but build into stage 2 repo
         paths.reinit_buildroot(oldmdir, 1)
@@ -698,7 +707,7 @@ def bootstrap(tgt):
     # set build root to stage 3 for chroot check
     paths.reinit_buildroot(oldmdir, 3)
 
-    if not chroot.chroot_check(True):
+    if not chroot.chroot_check(True, False):
         logger.get().out("cbuild: bootstrapping stage 3")
         # use stage 1 build root to build, but build into stage 2 repo
         paths.reinit_buildroot(oldmdir, 2)
@@ -737,32 +746,6 @@ def do_keygen(tgt):
     sign.register_key(keyn)
 
     sign.keygen(keysize, global_cfg, os.path.expanduser(cmdline.config))
-
-
-def do_chroot(tgt):
-    from cbuild.core import chroot, paths
-    from cbuild.util import compiler
-
-    if opt_mdirtemp:
-        chroot.install()
-    paths.prepare()
-    chroot.shell_update(not opt_nonet)
-    chroot.enter(
-        "/usr/bin/sh",
-        "-i",
-        fakeroot=True,
-        new_session=False,
-        mount_binpkgs=True,
-        mount_cbuild_cache=True,
-        env={
-            "HOME": "/tmp",
-            "TERM": "linux",
-            "CBUILD_SHELL": "1",
-            "PS1": "\\u@\\h: \\w$ ",
-            "SHELL": "/bin/sh",
-        },
-        lldargs=compiler._get_lld_cpuargs(opt_lthreads),
-    )
 
 
 def do_clean(tgt):
@@ -1616,6 +1599,7 @@ def do_dump(tgt):
 
 def do_pkg(tgt, pkgn=None, force=None, check=None, stage=None):
     from cbuild.core import build, chroot, template, errors
+    from cbuild.util import compiler
 
     if force is None:
         force = opt_force
@@ -1626,31 +1610,60 @@ def do_pkg(tgt, pkgn=None, force=None, check=None, stage=None):
     else:
         bstage = stage
     if not pkgn:
-        if len(cmdline.command) <= 1:
+        if len(cmdline.command) <= 1 and tgt != "chroot":
             raise errors.CbuildException(f"{tgt} needs a package name")
         elif len(cmdline.command) > 2:
             raise errors.CbuildException(f"{tgt} needs only one package")
-        pkgn = cmdline.command[1]
-    rp = template.read_pkg(
-        pkgn,
-        opt_arch if opt_arch else chroot.host_cpu(),
-        force,
-        check,
-        (opt_makejobs, opt_lthreads),
-        opt_gen_dbg,
-        opt_ccache,
-        None,
-        target=tgt if (tgt != "pkg") else None,
-        force_check=opt_forcecheck,
-        stage=bstage,
-        allow_restricted=opt_restricted,
+        if len(cmdline.command) > 1:
+            pkgn = cmdline.command[1]
+    rp = (
+        template.read_pkg(
+            pkgn,
+            opt_arch if opt_arch else chroot.host_cpu(),
+            force,
+            check,
+            (opt_makejobs, opt_lthreads),
+            opt_gen_dbg,
+            (opt_ccache, opt_tltocachesize if opt_tltocache else None),
+            None,
+            target=tgt if (tgt != "pkg") else None,
+            force_check=opt_forcecheck,
+            stage=bstage,
+            allow_restricted=opt_restricted,
+        )
+        if pkgn
+        else None
     )
     if opt_mdirtemp:
         chroot.install()
-    elif not stage and not chroot.chroot_check():
-        raise errors.CbuildException(
-            "build root not found (have you boootstrapped?)"
+    elif not stage:
+        chroot.chroot_check()
+    if tgt == "chroot":
+        chroot.shell_update(not opt_nonet)
+        if rp and (rp.builddir / rp.wrksrc).is_dir():
+            curwrk = rp.chroot_builddir / rp.wrksrc
+        elif rp and rp.builddir.is_dir():
+            curwrk = rp.chroot_builddir
+        else:
+            curwrk = None
+        chroot.enter(
+            "/usr/bin/sh",
+            "-i",
+            fakeroot=True,
+            new_session=False,
+            mount_binpkgs=True,
+            mount_cbuild_cache=True,
+            env={
+                "HOME": "/tmp",
+                "TERM": "linux",
+                "CBUILD_SHELL": "1",
+                "PS1": "\\u@\\h: \\w$ ",
+                "SHELL": "/bin/sh",
+            },
+            wrkdir=curwrk,
+            lldargs=compiler._get_lld_cpuargs(opt_lthreads),
         )
+        return
     # don't remove builddir/destdir
     chroot.prepare_arch(opt_arch, opt_dirty)
     build.build(
@@ -1812,7 +1825,7 @@ def _bulkpkg(pkgs, statusf, do_build, do_raw):
                 opt_check,
                 (opt_makejobs, opt_lthreads),
                 opt_gen_dbg,
-                opt_ccache,
+                (opt_ccache, opt_tltocachesize if opt_tltocache else None),
                 None,
                 force_check=opt_forcecheck,
                 bulk_mode=True,
@@ -2091,8 +2104,7 @@ def do_prepare_upgrade(tgt):
 
     pkgn = cmdline.command[1]
 
-    if not chroot.chroot_check():
-        raise errors.CbuildException("prepare-upgrade needs a bldroot")
+    chroot.chroot_check()
 
     tmpl = template.read_pkg(
         pkgn,
@@ -2209,7 +2221,7 @@ command_handlers = {
     ),
     "bump-pkgrel": (do_bump_pkgrel, "Increase the pkgrel of a template"),
     "check": (do_pkg, "Run up to check phase of a template"),
-    "chroot": (do_chroot, "Enter an interactive bldroot chroot"),
+    "chroot": (do_pkg, "Enter an interactive bldroot chroot"),
     "clean": (do_clean, "Clean the build directory"),
     "configure": (do_pkg, "Run up to configure phase of a template"),
     "cycle-check": (
@@ -2288,7 +2300,7 @@ def fire():
         chroot.set_host(cli.get_arch())
 
     # check container and while at it perform arch checks
-    chroot.chroot_check()
+    chroot.chroot_check(error=False)
 
     # ensure we've got a signing key
     if not opt_signkey and not opt_unsigned and cmdline.command[0] != "keygen":
