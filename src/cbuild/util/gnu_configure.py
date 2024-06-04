@@ -96,8 +96,10 @@ def configure(
     eenv["MAKE"] = make.Make(pkg).get_command()
     # libtoolize
     if (pkg.bldroot_path / "usr/bin/slibtoolize").exists():
+        eenv["MAKE"] += " LIBTOOL=rlibtool"
         eenv["LIBTOOLIZE"] = "slibtoolize"
-        eenv["LIBTOOL"] = "slibtool"
+        eenv["LIBTOOL"] = "rlibtool"
+        eenv["ACLOCAL"] = "aclocal -I /usr/share/slibtool"
 
     # caches taken from openembedded
     cachedir = paths.cbuild() / "misc/autoconf_cache"
