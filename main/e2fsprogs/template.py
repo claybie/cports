@@ -56,6 +56,11 @@ def post_patch(self):
         self.rm(f"tests/{test}", recursive=True)
 
 
+def init_configure(self):
+    # causes udevrulesdir to cross sysroot prefix otherwise
+    self.env["PKG_CONFIG_FDO_SYSROOT_RULES"] = "1"
+
+
 def post_install(self):
     # prevents udisks automount
     self.rm(self.destdir / "usr/lib/udev/rules.d/64-ext4.rules")

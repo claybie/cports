@@ -11,3 +11,5 @@ void-*.tar.xz
 bootstrap.*
 !bootstrap.sh
 !bootstrap.ini
+contrib/plasma*
+contrib/kde*
