@@ -1,6 +1,6 @@
 pkgname = "kio"
 pkgver = "6.2.0"
-pkgrel = 0
+pkgrel = 2
 build_style = "cmake"
 # flaky
 make_check_args = ["-E", "kiocore-krecentdocumenttest"]
@@ -23,6 +23,7 @@ makedepends = [
     "kcoreaddons-devel",
     "kcrash-devel",
     "kdbusaddons-devel",
+    "kded-devel",
     "kdoctools-devel",
     "kguiaddons-devel",
     "ki18n-devel",
@@ -39,6 +40,7 @@ makedepends = [
     "qt6-qttools-devel",
     "solid-devel",
 ]
+depends = ["kded"]
 checkdepends = ["dbus"]
 pkgdesc = "KDE Network transparent access to files and data"
 maintainer = "Jami Kettunen <jami.kettunen@protonmail.com>"
@@ -50,6 +52,7 @@ source = (
     f"$(KDE_SITE)/frameworks/{pkgver[:pkgver.rfind('.')]}/kio-{pkgver}.tar.xz"
 )
 sha256 = "331d6ff6b9cbb0e6521a5d0746b152be2588fd631a73d0e249b78cd2cda69ccf"
+tool_flags = {"LDFLAGS": ["-Wl,-z,stack-size=0x200000"]}
 # FIXME: cfi breaks at least plasma-workspace's testrunnermodel
 hardening = ["vis", "!cfi"]
 # >60% (40/62) tests fail, pain to get working in a limited enviroment due to expecting e.g. real disks
