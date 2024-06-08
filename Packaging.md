@@ -1881,9 +1881,9 @@ the tool via the `tools` variable in the template. Therefore, if you set
 like `aarch64-linux-musl-foo`.
 
 Additionally, these tools are also exported into the environment with
-their host values, as `BUILD_CC`, `BUILD_LD` and so on. This is to ensure
-that project build systems can utilize both host and target toolchains
-where appropriate.
+their host values, as `BUILD_CC`, `BUILD_LD` and so on, as well as GNU-style
+`CC_FOR_BUILD. and the likes This is to ensure that project build systems
+can utilize both host and target toolchains where appropriate.
 
 Tool flags have a bit more elaborate handling. Similarly to tools they
 are also exported into the environment by their names, including for
@@ -2048,6 +2048,7 @@ class Profile:
     cross = ...
     repos = ...
     goarch = ...
+    goarm = ...
 ```
 
 The properties have the following meanings:
@@ -2063,6 +2064,8 @@ The properties have the following meanings:
   `False` otherwise.
 * `goarch` The architecture name for the Go programming language. Optional
   and only present when supported by the toolchain.
+* `goarm` For 32-bit ARM (`goarch` is `arm`) this is the ARM architecture
+  version (ARMv5/6/7).
 
 For the `bootstrap` profile, `triplet` and `short_triplet` are `None`.
 
@@ -2155,6 +2158,8 @@ The following environment variables are exported into the sandbox:
 * `CBUILD_HOST_MACHINE` Host `apk` machine architecture.
 * `CBUILD_HOST_TRIPLET` Full host triplet (as described in profile).
   This is not exported during stage0 bootstrap.
+
+All `BUILD_foo` variables are also exported as `foo_FOR_BUILD`.
 
 Additionally, when using `ccache`, the following are also exported:
 

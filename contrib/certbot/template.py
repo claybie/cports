@@ -1,6 +1,6 @@
 pkgname = "certbot"
-pkgver = "2.10.0"
-pkgrel = 2
+pkgver = "2.11.0"
+pkgrel = 0
 build_wrksrc = "certbot"
 build_style = "python_pep517"
 _plugins = [
@@ -47,7 +47,7 @@ maintainer = "Duncan Bellamy <dunk@denkimushi.com>"
 license = "Apache-2.0 AND MIT"
 url = "https://github.com/certbot/certbot"
 source = f"{url}/archive/refs/tags/v{pkgver}.tar.gz"
-sha256 = "7e277bb461cae4071e22641e076d9232ae00ffda05bdb02832cbc1f862afab2d"
+sha256 = "93764a18e0b19fe5fc7471a02a2df1937c40eb65c86b3f9ea11b40416c1541dc"
 
 
 def post_build(self):
@@ -63,7 +63,10 @@ def post_build(self):
 
 
 def init_check(self):
-    self.make_check_args += [f"--numprocesses={self.make_jobs}"]
+    self.make_check_args += [
+        f"--numprocesses={self.make_jobs}",
+        "--dist=worksteal",
+    ]
 
 
 def post_install(self):
@@ -76,7 +79,7 @@ def post_install(self):
             "0",
             "--destdir",
             self.chroot_destdir,
-            f"../{plugin}/dist/{plugin.replace('-','_')}-{pkgver}-py3-none-any.whl",
+            f"../{plugin}/dist/{plugin.replace('-', '_')}-{pkgver}-py3-none-any.whl",
         )
     self.install_license("LICENSE.txt")
 
